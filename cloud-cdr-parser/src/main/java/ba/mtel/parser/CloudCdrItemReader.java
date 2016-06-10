@@ -167,7 +167,7 @@ public class CloudCdrItemReader extends FlatFileItemReader<CloudCdr> implements 
 			return null;
 		}
 		else {
-			try {
+			try { 
 				CloudCdr c = lineMapper.mapLine(line, lineCount);
 				System.out.println("doRead: "+resource.getFilename());
 
