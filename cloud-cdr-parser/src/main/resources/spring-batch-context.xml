@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:batch="http://www.springframework.org/schema/batch"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+		http://www.springframework.org/schema/batch http://www.springframework.org/schema/batch/spring-batch.xsd">
+
+	<!-- JobRepository and JobLauncher are configuration/setup classes -->
+	<bean id="jobRepository"
+		class="org.springframework.batch.core.repository.support.MapJobRepositoryFactoryBean" />
+
+	<bean id="jobLauncher"
+		class="org.springframework.batch.core.launch.support.SimpleJobLauncher">
+		<property name="jobRepository" ref="jobRepository" />
+	</bean>
+
+	<bean id="multiResourceReader"
+		class="org.springframework.batch.item.file.MultiResourceItemReader" >
+		<property name="resources" value="file:C:/mywork/cdr/Cloud*.txt" />
+		<property name="delegate" ref="cloudCdrItemReader" />
+	</bean>
+
+	<!-- ItemReader reads a complete line one by one from input file -->
+	<bean id="cloudCdrItemReader" class="ba.mtel.parser.CloudCdrItemReader" >
+
+		<property name="lineMapper">
+			<bean class="org.springframework.batch.item.file.mapping.DefaultLineMapper">
+				<property name="fieldSetMapper" ref="cdrFieldSetMapper">
+				</property>
+
+				<property name="lineTokenizer">
+					<!-- A tokenizer class to be used when items in input record are separated 
+						by specific characters -->
+					<bean
+						class="org.springframework.batch.item.file.transform.DelimitedLineTokenizer">
+						<property name="delimiter" value="|" />
+					</bean>
+				</property>
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="cdrFieldSetMapper" class="ba.mtel.parser.CloudCdrFieldSetMapper"
+		scope="step">
+	</bean>
+
+	<bean id="oracleItemWriter"
+		class="org.springframework.batch.item.database.JdbcBatchItemWriter">
+		<property name="dataSource" ref="dataSource" />
+		<property name="sql">
+			<value>
+            <![CDATA[        
+            	insert into CLOUD_FILES(CLOUD,SERVICE_NAME,IZNOS,DATE_FILE) 
+			values (:cloud, :service, :amount, :date)
+            ]]>
+			</value>
+		</property>
+		<!-- It will take care matching between object property and sql name parameter -->
+		<property name="itemSqlParameterSourceProvider">
+			<bean
+				class="org.springframework.batch.item.database.BeanPropertyItemSqlParameterSourceProvider" />
+		</property>
+	</bean>
+	<!-- Optional ItemProcessor to perform business logic/filtering on the input 
+		records -->
+	<bean id="itemProcessor" class="ba.mtel.parser.CloudCdrItemProcessor" scope="prototype">
+		<!-- 
+		<property name="fileName" value="#{cloudCdrItemReader.fileName}" />
+		<property name="executionContext" value="#{cloudCdrItemReader.executionContext}" />  
+		-->
+	</bean>
+
+	<!-- Step will need a transaction manager -->
+	<bean id="transactionManager"
+		class="org.springframework.batch.support.transaction.ResourcelessTransactionManager" />
+	<!-- Actual Job -->
+	<batch:job id="parseCdrJob">
+		<batch:step id="step1">
+			<batch:tasklet transaction-manager="transactionManager">
+				<batch:chunk reader="multiResourceReader" writer="oracleItemWriter"
+					processor="itemProcessor" commit-interval="2" />
+			</batch:tasklet>
+		</batch:step>
+		<!--  
+		<batch:step id="step2" parent="step1">
+			<batch:tasklet transaction-manager="transactionManager">
+				<batch:chunk processor="itemProcessor" commit-interval="2" />
+			</batch:tasklet>
+		</batch:step>
+		-->
+		
+	</batch:job>
+</beans>
