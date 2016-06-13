@@ -45,11 +45,11 @@ public class CloudCdrItemProcessor implements ItemProcessor<CloudCdr, CloudCdr> 
 
 		// skracivanje duzine ako servis ima preko 127 karaktera
 		if (cdr.getService().length() > 127) {
-			String sub = cdr.getService().replaceAll(" ", "");
+			/*String sub = cdr.getService().replaceAll(" ", "");
 			if (sub.length() > 127)
-				sub = sub.substring(0, 126);
+				sub = sub.substring(0, 126);*/
 
-			cdr.setService(sub);
+			cdr.setService(Util.shortenService(cdr.getService()));
 		}
 		// parsiranje datuma iz imena fajla
 
