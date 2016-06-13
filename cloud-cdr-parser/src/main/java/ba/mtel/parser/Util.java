@@ -32,4 +32,20 @@ public class Util {
 		}
 		return sqlDate;
 	}
+	public static String shortenService(String service) {
+        String sub = service.replaceAll(" ", "");
+        if (sub.length() > 127) {
+            sub = sub.substring(0, 126);
+        }
+        if (sub.contains("SLA:")) {
+            int i = sub.indexOf("SLA:");
+            String prijeSla = sub.substring(0, i);
+            String sla = sub.substring(i);
+            if (sla.contains(";")) {
+                sla = sla.substring(0, sla.indexOf(";"));
+            }
+            sub = prijeSla + sla;
+        }
+        return sub;
+    }
 }

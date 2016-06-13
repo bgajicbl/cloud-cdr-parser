@@ -21,6 +21,7 @@
 
 	<!-- ItemReader reads a complete line one by one from input file -->
 	<bean id="cloudCdrItemReader" class="ba.mtel.parser.CloudCdrItemReader" >
+		<property name="doneFolder" value="/done/" />
 
 		<property name="lineMapper">
 			<bean class="org.springframework.batch.item.file.mapping.DefaultLineMapper">

@@ -3,6 +3,10 @@ package ba.mtel.parser;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.nio.charset.Charset;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.Map;
 import java.util.Set;
 
@@ -32,7 +36,7 @@ import org.springframework.util.ClassUtils;
 import org.springframework.util.StringUtils;
 
 @Component("cloudCdrItemReader")
-@Scope("step") 
+@Scope("step")
 public class CloudCdrItemReader extends FlatFileItemReader<CloudCdr> implements ResourceAware {
 
 	private static final Log logger = LogFactory.getLog(FlatFileItemReader.class);
@@ -45,6 +49,8 @@ public class CloudCdrItemReader extends FlatFileItemReader<CloudCdr> implements 
 	private Resource resource;
 
 	private BufferedReader reader;
+
+	private String doneFolder;
 
 	private int lineCount = 0;
 
@@ -70,25 +76,33 @@ public class CloudCdrItemReader extends FlatFileItemReader<CloudCdr> implements 
 
 	/**
 	 * In strict mode the reader will throw an exception on
-	 * {@link #open(org.springframework.batch.item.ExecutionContext)} if the input resource does not exist.
-	 * @param strict <code>true</code> by default
+	 * {@link #open(org.springframework.batch.item.ExecutionContext)} if the
+	 * input resource does not exist.
+	 * 
+	 * @param strict
+	 *            <code>true</code> by default
 	 */
 	public void setStrict(boolean strict) {
 		this.strict = strict;
 	}
 
 	/**
-	 * @param skippedLinesCallback will be called for each one of the initial skipped lines before any items are read.
+	 * @param skippedLinesCallback
+	 *            will be called for each one of the initial skipped lines
+	 *            before any items are read.
 	 */
 	public void setSkippedLinesCallback(LineCallbackHandler skippedLinesCallback) {
 		this.skippedLinesCallback = skippedLinesCallback;
 	}
 
 	/**
-	 * Public setter for the number of lines to skip at the start of a file. Can be used if the file contains a header
-	 * without useful (column name) information, and without a comment delimiter at the beginning of the lines.
+	 * Public setter for the number of lines to skip at the start of a file. Can
+	 * be used if the file contains a header without useful (column name)
+	 * information, and without a comment delimiter at the beginning of the
+	 * lines.
 	 * 
-	 * @param linesToSkip the number of lines to skip
+	 * @param linesToSkip
+	 *            the number of lines to skip
 	 */
 	public void setLinesToSkip(int linesToSkip) {
 		this.linesToSkip = linesToSkip;
@@ -96,37 +110,45 @@ public class CloudCdrItemReader extends FlatFileItemReader<CloudCdr> implements 
 
 	/**
 	 * Setter for line mapper. This property is required to be set.
-	 * @param lineMapper maps line to item
+	 * 
+	 * @param lineMapper
+	 *            maps line to item
 	 */
 	public void setLineMapper(LineMapper<CloudCdr> lineMapper) {
 		this.lineMapper = lineMapper;
 	}
 
 	/**
-	 * Setter for the encoding for this input source. Default value is {@link #DEFAULT_CHARSET}.
+	 * Setter for the encoding for this input source. Default value is
+	 * {@link #DEFAULT_CHARSET}.
 	 * 
-	 * @param encoding a properties object which possibly contains the encoding for this input file;
+	 * @param encoding
+	 *            a properties object which possibly contains the encoding for
+	 *            this input file;
 	 */
 	public void setEncoding(String encoding) {
 		this.encoding = encoding;
 	}
 
 	/**
-	 * Factory for the {@link BufferedReader} that will be used to extract lines from the file. The default is fine for
-	 * plain text files, but this is a useful strategy for binary files where the standard BufferedReaader from java.io
-	 * is limiting.
+	 * Factory for the {@link BufferedReader} that will be used to extract lines
+	 * from the file. The default is fine for plain text files, but this is a
+	 * useful strategy for binary files where the standard BufferedReaader from
+	 * java.io is limiting.
 	 * 
-	 * @param bufferedReaderFactory the bufferedReaderFactory to set
+	 * @param bufferedReaderFactory
+	 *            the bufferedReaderFactory to set
 	 */
 	public void setBufferedReaderFactory(BufferedReaderFactory bufferedReaderFactory) {
 		this.bufferedReaderFactory = bufferedReaderFactory;
 	}
 
 	/**
-	 * Setter for comment prefixes. Can be used to ignore header lines as well by using e.g. the first couple of column
-	 * names as a prefix.
+	 * Setter for comment prefixes. Can be used to ignore header lines as well
+	 * by using e.g. the first couple of column names as a prefix.
 	 * 
-	 * @param comments an array of comment line prefixes.
+	 * @param comments
+	 *            an array of comment line prefixes.
 	 */
 	public void setComments(String[] comments) {
 		this.comments = new String[comments.length];
@@ -136,16 +158,22 @@ public class CloudCdrItemReader extends FlatFileItemReader<CloudCdr> implements 
 	/**
 	 * Public setter for the input resource.
 	 */
-    @Override
+	@Override
 	public void setResource(Resource resource) {
 		this.resource = resource;
 	}
 
+	public void setDoneFolder(String doneFolder) {
+		this.doneFolder = doneFolder;
+	}
+
 	/**
-	 * Public setter for the recordSeparatorPolicy. Used to determine where the line endings are and do things like
-	 * continue over a line ending if inside a quoted string.
+	 * Public setter for the recordSeparatorPolicy. Used to determine where the
+	 * line endings are and do things like continue over a line ending if inside
+	 * a quoted string.
 	 * 
-	 * @param recordSeparatorPolicy the recordSeparatorPolicy to set
+	 * @param recordSeparatorPolicy
+	 *            the recordSeparatorPolicy to set
 	 */
 	public void setRecordSeparatorPolicy(RecordSeparatorPolicy recordSeparatorPolicy) {
 		this.recordSeparatorPolicy = recordSeparatorPolicy;
@@ -153,7 +181,8 @@ public class CloudCdrItemReader extends FlatFileItemReader<CloudCdr> implements 
 
 	/**
 	 * @return string corresponding to logical record according to
-	 * {@link #setRecordSeparatorPolicy(RecordSeparatorPolicy)} (might span multiple lines in file).
+	 *         {@link #setRecordSeparatorPolicy(RecordSeparatorPolicy)} (might
+	 *         span multiple lines in file).
 	 */
 	@Override
 	protected CloudCdr doRead() throws Exception {
@@ -165,16 +194,14 @@ public class CloudCdrItemReader extends FlatFileItemReader<CloudCdr> implements 
 
 		if (line == null) {
 			return null;
-		}
-		else {
-			try { 
+		} else {
+			try {
 				CloudCdr c = lineMapper.mapLine(line, lineCount);
-				System.out.println("doRead: "+resource.getFilename());
+				System.out.println("doRead: " + resource.getFilename());
 
 				c.setDate(Util.parseDate(resource.getFilename()));
 				return c;
-			}
-			catch (Exception ex) {
+			} catch (Exception ex) {
 				throw new FlatFileParseException("Parsing error at line: " + lineCount + " in resource=["
 						+ resource.getDescription() + "], input=[" + line + "]", ex, line, lineCount);
 			}
@@ -207,8 +234,7 @@ public class CloudCdrItemReader extends FlatFileItemReader<CloudCdr> implements 
 			}
 
 			line = applyRecordSeparatorPolicy(line);
-		}
-		catch (IOException e) {
+		} catch (IOException e) {
 			// Prevent IOException from recurring indefinitely
 			// if client keeps catching and re-calling
 			noInput = true;
@@ -233,6 +259,13 @@ public class CloudCdrItemReader extends FlatFileItemReader<CloudCdr> implements 
 		if (reader != null) {
 			reader.close();
 		}
+		Path sourcePath = Paths.get(resource.getURI());
+		Path destinationPath = Paths.get(sourcePath.getParent() + doneFolder + resource.getFilename());
+		try {
+			Files.move(sourcePath, destinationPath, StandardCopyOption.REPLACE_EXISTING);
+		} catch (IOException e) {
+			logger.warn("File moving to done folder failed!");
+		}
 	}
 
 	@Override
@@ -251,8 +284,8 @@ public class CloudCdrItemReader extends FlatFileItemReader<CloudCdr> implements 
 
 		if (!resource.isReadable()) {
 			if (strict) {
-				throw new IllegalStateException("Input resource must be readable (reader is in 'strict' mode): "
-						+ resource);
+				throw new IllegalStateException(
+						"Input resource must be readable (reader is in 'strict' mode): " + resource);
 			}
 			logger.warn("Input resource is not readable " + resource.getDescription());
 			return;
@@ -268,7 +301,7 @@ public class CloudCdrItemReader extends FlatFileItemReader<CloudCdr> implements 
 		noInput = false;
 	}
 
-    @Override
+	@Override
 	public void afterPropertiesSet() throws Exception {
 		Assert.notNull(lineMapper, "LineMapper is required");
 	}
@@ -289,16 +322,15 @@ public class CloudCdrItemReader extends FlatFileItemReader<CloudCdr> implements 
 				if (StringUtils.hasText(record)) {
 					// A record was partially complete since it hasn't ended but
 					// the line is null
-					throw new FlatFileParseException("Unexpected end of file before record complete", record, lineCount);
-				}
-				else {
+					throw new FlatFileParseException("Unexpected end of file before record complete", record,
+							lineCount);
+				} else {
 					// Record has no text but it might still be post processed
 					// to something (skipping preProcess since that was already
 					// done)
 					break;
 				}
-			}
-			else {
+			} else {
 				lineCount++;
 			}
 			record = recordSeparatorPolicy.preProcess(record) + line;
