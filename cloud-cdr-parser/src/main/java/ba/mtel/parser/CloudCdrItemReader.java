@@ -171,7 +171,7 @@ public class CloudCdrItemReader extends FlatFileItemReader<CloudCdr> implements 
 				CloudCdr c = lineMapper.mapLine(line, lineCount);
 				System.out.println("doRead: "+resource.getFilename());
 
-				c.setDate(new java.sql.Date(java.lang.System.currentTimeMillis()));
+				c.setDate(Util.parseDate(resource.getFilename()));
 				return c;
 			}
 			catch (Exception ex) {
